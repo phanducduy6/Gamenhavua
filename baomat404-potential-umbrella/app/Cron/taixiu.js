@@ -514,30 +514,6 @@ let playGame = function(){
 		}
 	//	bot.regbot();
 		io.TaiXiu_time--;
-		if (io.TaiXiu_time == 3 && botList.length > 0) {
-
-			let lech = io.taixiu.taixiu.red_tai - io.taixiu.taixiu.red_xiu;
-			if (lech !== 0) {
-				let botCanCua = botList[Math.floor(Math.random() * botList.length)];
-				let tienCan = Math.abs(lech);
-				let select = lech < 0;
-
-				console.log(`[CÂN CỬA] Bot ${botCanCua.name} cược ${select ? 'Tài' : 'Xỉu'}: ${tienCan}`);
-				bot.tx(botCanCua, io, tienCan, select);
-				botList.splice(botList.indexOf(botCanCua), 1);
-			}
-
-			let home = {taixiu:{taixiu:{red_tai: io.taixiu.taixiu.red_tai, red_xiu: io.taixiu.taixiu.red_xiu},err: 'Đang cân cửa'}};
-			Object.values(io.users).forEach(function(users){
-				users.forEach(function(client){
-					if (client.gameEvent !== void 0 && client.gameEvent.viewTaiXiu !== void 0 && client.gameEvent.viewTaiXiu){
-						client.red(home);
-					}else if(client.scene == 'home'){
-						client.red(home);
-					}
-				});
-			});
-		}
 		if (io.TaiXiu_time <= 60) {
 			if (io.TaiXiu_time < 0) {
 				clearInterval(gameLoop);
@@ -613,30 +589,20 @@ let playGame = function(){
 				}
 			}else{
 				thongtin_thanhtoan(io.TaiXiu_phien);
-				
-				if (!!botList.length && io.TaiXiu_time > 4) {
-					let timeBot = (Math.floor(Math.random()*(3-1+1))+1)>>0;
-					if (!(io.TaiXiu_time%timeBot)) {
-						
-						let userCuoc = 0;
-					if (!((Math.random()*3)>>0)) {
-						userCuoc = (Math.random()*10)>>0;
-					}else{
-						userCuoc = (Math.random()*20)>>0;
-					}
-
-						let iH = 0;
-						for (iH = 0; iH < userCuoc; iH++) {
-							let dataT = botList[iH];
-							if (!!dataT) {
-								bot.tx(dataT, io);
-								botList.splice(iH, 1); // Xoá bot đã đặt tránh trùng lặp
-								}
-							}
-							dataT = null;
+				if (!!botList.length && io.TaiXiu_time > 5) {
+					let botBetCount = 1 + ((Math.random() * 3) >> 0);
+					for (let i = 0; i < botBetCount; i++) {
+						let dataT = botList[(Math.random() * botList.length) >> 0];
+						if (!dataT) {
+							continue;
 						}
+						let side = !!((Math.random() * 2) >> 0);
+						bot.tx(dataT, io, undefined, side).catch(function (betErr) {
+							console.error('Tai Xiu bot bet error:', betErr);
+						});
 					}
 				}
+			}
 		}
 		// botHu(io, botTemp); // Tạm tắt Bot Nổ Hũ để chống nghẽn mạng
 	}, 1000);

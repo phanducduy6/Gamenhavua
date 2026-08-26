@@ -38,7 +38,7 @@ let RongHo_user = require('../../Models/RongHo/RongHo_user');
  * return {number}
 */
 let random = function () {
-	return Math.floor(Math.random() * 4900000000) + 100000000;
+	return Math.floor(Math.random() * 4900000001) + 100000000;
 };
 
 /**
@@ -48,23 +48,42 @@ let random = function () {
 let tx = function (bot, io, amount, side) {
 	let cuoc = amount === undefined ? random() : amount;
 	let select = side === undefined ? !!((Math.random() * 2) >> 0) : side;
-	if (select) {
-		io.taixiu.taixiu.red_tai += cuoc;
-		io.taixiu.taixiu.red_player_tai += 1;
-		console.log('bot đã cược tài');
-	} else {
-		io.taixiu.taixiu.red_xiu += cuoc;
-		io.taixiu.taixiu.red_player_xiu += 1;
-		console.log('bot đã cược xĩu');
-	}
-	if (cuoc > 1) {
-		TXCuocOne.create({ uid: bot.id, phien: io.TaiXiu_phien, select: select, bet: cuoc });
-		TXCuoc.create({ uid: bot.id, bot: true, name: bot.name, phien: io.TaiXiu_phien, bet: cuoc, select: select, time: new Date() })
-	};
-	bot = null;
-	io = null;
-	cuoc = null;
-	select = null;
+	return UserInfo.findOneAndUpdate(
+		{id: bot.id, type: true, red: {$gte: cuoc}},
+		{$inc: {red: -cuoc}},
+		{new: true}
+	).exec().then(function (user) {
+		if (!user) {
+			return false;
+		}
+
+		if (select) {
+			io.taixiu.taixiu.red_tai += cuoc;
+			io.taixiu.taixiu.red_player_tai += 1;
+			console.log('bot đã cược tài');
+		} else {
+			io.taixiu.taixiu.red_xiu += cuoc;
+			io.taixiu.taixiu.red_player_xiu += 1;
+			console.log('bot đã cược xĩu');
+		}
+
+		return Promise.all([
+			TXCuocOne.create({uid: bot.id, phien: io.TaiXiu_phien, taixiu: true, red: true, select: select, bet: cuoc}),
+			TXCuoc.create({uid: bot.id, bot: true, name: bot.name, phien: io.TaiXiu_phien, bet: cuoc, taixiu: true, red: true, select: select, time: new Date()})
+		]).then(function () {
+			return true;
+		});
+	});
+};
+
+let balance = function (io, amount, side) {
+	return UserInfo.find({type: true, red: {$gte: amount}}, 'id name').exec().then(function (bots) {
+		if (!bots.length) {
+			return false;
+		}
+		let selectedBot = bots[(Math.random() * bots.length) >> 0];
+		return tx(selectedBot, io, amount, side);
+	});
 };
 let regbot = function () {
 	var username = 'nohu' + helpers.RandomUserName(5) + helpers.RandomUserName(1);
@@ -133,6 +152,7 @@ let regbot = function () {
 
 module.exports = {
 	tx: tx,
+	balance: balance,
 	//cl: cl,
 	regbot: regbot,
 }

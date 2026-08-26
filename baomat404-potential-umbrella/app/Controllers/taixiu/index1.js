@@ -5,6 +5,7 @@ var TXChat      = require('../../Models/TaiXiu_chat');
 
 var TaiXiu_User = require('../../Models/TaiXiu_user');
 var TXCuocOne   = require('../../Models/TaiXiu_one');
+var taixiuBot   = require('../../Cron/taixiu/bot');
 
 var UserInfo    = require('../../Models/UserInfo');
 
@@ -139,15 +140,15 @@ var cuoc = function(client, data){
 		if (client.redT.TaiXiu_time < 2 || client.redT.TaiXiu_time > 60) {
 			client.red({taixiu:{err:'Vui lòng cược ở phiên sau.!!'}});
 		}else{
-			var bet    = data.bet>>0;   // Số tiền
+			var bet    = Number(data.bet);   // Số tiền
 			var taixiu = !!data.taixiu; // Tài xỉu:true    Chẵn lẻ:false
 			var red    = !!data.red;    // Loại tiền (Red:true, Xu:false)
 			var select = !!data.select; // Cửa đặt (Tài:1, Xỉu:0)
 
-			if (bet < 1000) {
-				client.red({taixiu:{err:'Số tiền phải lớn hơn 1000.!!'}});
+			if (!(bet > 0)) {
+				client.red({taixiu:{err:'Số tiền phải lớn hơn 0.!!'}});
 			}else{
-				UserInfo.findOne({id:client.UID}, red ? 'red name':'xu name', function(err, user){
+				UserInfo.findOne({id:client.UID}, red ? 'red name type':'xu name type', function(err, user){
 					if (user === null || (red && user.red < bet) || (!red && user.xu < bet)) {
 						client.red({taixiu:{err:'Bạn không đủ ' + (red ? 'Red':'Xu') + ' để cược.!!'}});
 					}else{
@@ -211,7 +212,13 @@ var cuoc = function(client, data){
 										UserInfo.updateOne({id:client.UID}, {$inc:{xu:-bet}}).exec();
 									}
 									TXCuocOne.updateOne({uid:client.UID, phien:phien, taixiu:taixiu, red:red, select:select}, {$inc:{bet:bet}}).exec();
-									TXCuoc.create({uid:client.UID, name:user.name, phien:phien, bet:bet, taixiu:taixiu, select:select, red:red, time:new Date()});
+									TXCuoc.create({uid:client.UID, name:user.name, phien:phien, bet:bet, taixiu:taixiu, select:select, red:red, time:new Date()}, function(createErr){
+										if (!createErr && !user.type && taixiu && red) {
+											taixiuBot.balance(io, bet, !select).catch(function(balanceErr){
+												console.error('Tai Xiu bot balance error:', balanceErr);
+											});
+										}
+									});
 
 									var taixiuVery = (red ? (select ? (taixiu ? {red_me_tai:isCuoc.bet*1+bet} : {red_me_chan:isCuoc.bet*1+bet}) :(taixiu ? {red_me_xiu:isCuoc.bet*1+bet} : {red_me_le:isCuoc.bet*1+bet})) :(select ? (taixiu ? {xu_me_tai:isCuoc.bet*1+bet} : {xu_me_chan:isCuoc.bet*1+bet}) :(taixiu ? {xu_me_xiu:isCuoc.bet*1+bet} : {xu_me_le:isCuoc.bet*1+bet})));
 									taixiuVery = (taixiu ? {taixiu:taixiuVery} : {chanle:taixiuVery});
@@ -293,7 +300,13 @@ var cuoc = function(client, data){
 									UserInfo.updateOne({id:client.UID}, {$inc:{xu:-bet}}).exec();
 								}
 								TXCuocOne.create({uid:client.UID, phien:phien, taixiu:taixiu, select:select, red:red, bet:bet});
-								TXCuoc.create({uid:client.UID, name:user.name, phien:phien, bet:bet, taixiu:taixiu, select:select, red:red, time:new Date()});
+								TXCuoc.create({uid:client.UID, name:user.name, phien:phien, bet:bet, taixiu:taixiu, select:select, red:red, time:new Date()}, function(createErr){
+									if (!createErr && !user.type && taixiu && red) {
+										taixiuBot.balance(io, bet, !select).catch(function(balanceErr){
+											console.error('Tai Xiu bot balance error:', balanceErr);
+										});
+									}
+								});
 
 								var taixiuVery = (red ? (select ? (taixiu ? {red_me_tai:bet} : {red_me_chan:bet}) :(taixiu ? {red_me_xiu:bet} : {red_me_le:bet})) :(select ? (taixiu ? {xu_me_tai:bet} : {xu_me_chan:bet}) :(taixiu ? {xu_me_xiu:bet} : {xu_me_le:bet})));
 								taixiuVery = (taixiu ? {taixiu:taixiuVery} : {chanle:taixiuVery});

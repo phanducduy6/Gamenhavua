@@ -115,10 +115,10 @@ var cuoc = function(client, data){
 		if (client.redT.TaiXiu_time < 2 || client.redT.TaiXiu_time > 60) {
 			client.red({taixiu:{err:'Vui lòng cược ở phiên sau.!!'}});
 		}else{
-			let bet    = data.bet>>0;   // Số tiền
+			let bet    = Number(data.bet);   // Số tiền
 			let select = !!data.select; // Cửa đặt (Tài:1, Xỉu:0)
-			if (bet < 1000){
-				client.red({taixiu:{err:'Số tiền phải lớn hơn 1000.!!'}});
+			if (!(bet > 0)){
+				client.red({taixiu:{err:'Số tiền phải lớn hơn 0.!!'}});
 			}else{
 				UserInfo.findOne({id:client.UID}, 'red name', function(err, user){
 					if (user === null || user.red < bet) {
