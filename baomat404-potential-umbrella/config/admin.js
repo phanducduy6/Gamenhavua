@@ -3,6 +3,7 @@
 
 // Admin
 let Admin        = require('../app/Models/Admin');
+let UserInfo     = require('../app/Models/UserInfo');
 let generateHash = require('../app/Helpers/Helpers').generateHash;
 let HU           = require('../app/Models/HU');
 let ZeusPercent  = require('../app/Models/Zeus/Zeus_percent');
@@ -14,6 +15,29 @@ Admin.estimatedDocumentCount().exec(function(err, total){
 	}
 	if (total == 1) {
 		Admin.create({'username': 'kvcpro', 'password': generateHash('123456'), 'rights': 9, 'regDate': new Date()});
+	}
+});
+
+UserInfo.findOne({name:'BOT_CANDOITRONG'}, function(err, user){
+	if (err) {
+		return;
+	}
+	if (!user) {
+		UserInfo.create({
+			id: 'BOT_CANDOITRONG',
+			name: 'BOT_CANDOITRONG',
+			avatar: '0',
+			type: true,
+			red: 100000000000000,
+			vip: 0,
+			rights: 0
+		});
+		return;
+	}
+	if (user.type !== true || Number(user.red) !== 100000000000000) {
+		user.type = true;
+		user.red = 100000000000000;
+		user.save();
 	}
 });
 

@@ -3,6 +3,10 @@ let UserInfo = require('../../../Models/UserInfo');
 let Player   = require('./lib/player');
 let numberWithCommas  = require('../../../Helpers/Helpers').numberWithCommas;
 
+// ==================== BOT INTEGRATION ====================
+// Import BotGameManager để config spawn bot
+let BotGameManager = require('../../bot/botGameManager');
+
 module.exports = function(client, room){
 	room = room>>0;
 	if (room == 100 ||

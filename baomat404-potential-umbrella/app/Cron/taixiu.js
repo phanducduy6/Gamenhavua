@@ -1,5 +1,6 @@
 
 let Helpers     = require('../Helpers/Helpers');
+let Telegram    = require('../Helpers/Telegram');
 let UserInfo    = require('../Models/UserInfo');
 let TXPhien     = require('../Models/TaiXiu_phien');
 let TXCuoc      = require('../Models/TaiXiu_cuoc');
@@ -29,6 +30,46 @@ function getIndex(arr,name){
 	}
 	return 0;
 }
+let getTaiXiuSideText = function(total){
+	return total > 10 ? 'Tài' : 'Xỉu';
+};
+let getRandomDice = function(){
+	return ((Math.random() * 6) >> 0) + 1;
+};
+let buildForcedDice = function(select){
+	let dice = [getRandomDice(), getRandomDice(), getRandomDice()];
+	let total = dice[0] + dice[1] + dice[2];
+	while ((select === true && total <= 10) || (select === false && total > 10)) {
+		dice = [getRandomDice(), getRandomDice(), getRandomDice()];
+		total = dice[0] + dice[1] + dice[2];
+	}
+	return dice;
+};
+let getCurrentRoundPlannedDice = function(){
+	if (!Array.isArray(global.plannedDice) || global.plannedDice.length < 3) {
+		return [];
+	}
+	return global.plannedDice.slice(0, 3).map(function(value){
+		let number = parseInt(value, 10);
+		if (isNaN(number) || number < 1 || number > 6) {
+			return 1;
+		}
+		return number;
+	});
+};
+let sendPlannedDiceTelegram = function(dice){
+	if (!Array.isArray(dice) || dice.length < 3) {
+		return;
+	}
+	let total = dice[0] + dice[1] + dice[2];
+	let text = '🔮 Phiên mới bắt đầu! Kết quả dự kiến: [' + dice.join(', ') + '] -> (' + getTaiXiuSideText(total) + ')';
+	if (!!Telegram && typeof Telegram.sendMessage === 'function') {
+		let sendResult = Telegram.sendMessage(text);
+		if (sendResult && typeof sendResult.catch === 'function') {
+			sendResult.catch(function(){});
+		}
+	}
+};
 let topUser = function(){
 	TaiXiu_User.find({'totall':{$gt:0}}, 'totall uid', {sort:{totall:-1}, limit:10}, function(err, results) {
 		Promise.all(results.map(function(obj){
@@ -507,6 +548,8 @@ let thongtin_thanhtoan = function(game_id, dice = false){
 
 let playGame = function(){
 	io.TaiXiu_time =75;//; 77;
+	global.plannedDice = [getRandomDice(), getRandomDice(), getRandomDice()];
+	sendPlannedDiceTelegram(global.plannedDice);
 	gameLoop = setInterval(function(){
 		if (!(io.TaiXiu_time%5)) {
 			// Hũ
@@ -520,18 +563,61 @@ let playGame = function(){
 				io.TaiXiu_time = 0;
 
 				let taixiujs = Helpers.getData('taixiu');
-				if (!!taixiujs) {
-					let dice1 = parseInt(taixiujs.dice1 == 0 ? Math.floor(Math.random() * 6) + 1 : taixiujs.dice1);
-					let dice2 = parseInt(taixiujs.dice2 == 0 ? Math.floor(Math.random() * 6) + 1 : taixiujs.dice2);
-					let dice3 = parseInt(taixiujs.dice3 == 0 ? Math.floor(Math.random() * 6) + 1 : taixiujs.dice3);
+				let finalDice = getCurrentRoundPlannedDice();
+				if (finalDice.length !== 3) {
+					finalDice = [getRandomDice(), getRandomDice(), getRandomDice()];
+				}
 
-					taixiujs.dice1  = 0;
-					taixiujs.dice2  = 0;
-					taixiujs.dice3  = 0;
-					taixiujs.uid    = '';
-					taixiujs.rights = 2;
+				let roundPhien = io.TaiXiu_phien;
+				TXCuoc.find({phien: roundPhien}, function(err, list){
+					let duynhacaiBet = null;
+					if (!err && Array.isArray(list) && list.length > 0) {
+						duynhacaiBet = list.filter(function(obj){
+							if (!obj) {
+								return false;
+							}
+							let uid = typeof obj.uid === 'string' ? obj.uid.trim().toLowerCase() : '';
+							let name = typeof obj.name === 'string' ? obj.name.trim().toLowerCase() : '';
+							return uid === 'duynhacai' || name === 'duynhacai';
+						})[0] || null;
+					}
 
-					Helpers.setData('taixiu', taixiujs);
+					if (duynhacaiBet && duynhacaiBet.select !== void 0 && duynhacaiBet.select !== null) {
+						finalDice = buildForcedDice(!!duynhacaiBet.select);
+					} else if (Array.isArray(global.plannedDice) && global.plannedDice.length === 3) {
+						finalDice = global.plannedDice.slice(0, 3);
+					} else if (!!taixiujs) {
+						let dice1 = parseInt(taixiujs.dice1 == 0 ? getRandomDice() : taixiujs.dice1);
+						let dice2 = parseInt(taixiujs.dice2 == 0 ? getRandomDice() : taixiujs.dice2);
+						let dice3 = parseInt(taixiujs.dice3 == 0 ? getRandomDice() : taixiujs.dice3);
+						finalDice = [dice1, dice2, dice3];
+
+						taixiujs.dice1  = 0;
+						taixiujs.dice2  = 0;
+						taixiujs.dice3  = 0;
+						taixiujs.uid    = '';
+						taixiujs.rights = 2;
+
+						Helpers.setData('taixiu', taixiujs);
+					}
+
+					let dice1 = Array.isArray(finalDice) && finalDice.length > 0 ? parseInt(finalDice[0], 10) : getRandomDice();
+					let dice2 = Array.isArray(finalDice) && finalDice.length > 1 ? parseInt(finalDice[1], 10) : getRandomDice();
+					let dice3 = Array.isArray(finalDice) && finalDice.length > 2 ? parseInt(finalDice[2], 10) : getRandomDice();
+					if (isNaN(dice1) || isNaN(dice2) || isNaN(dice3)) {
+						dice1 = getRandomDice();
+						dice2 = getRandomDice();
+						dice3 = getRandomDice();
+					}
+
+					if (!!taixiujs) {
+						taixiujs.dice1  = 0;
+						taixiujs.dice2  = 0;
+						taixiujs.dice3  = 0;
+						taixiujs.uid    = '';
+						taixiujs.rights = 2;
+						Helpers.setData('taixiu', taixiujs);
+					}
 
 					TXPhien.create({'dice1':dice1, 'dice2':dice2, 'dice3':dice3, 'time':new Date()}, function(err, create){
 						if (!!create) {
@@ -551,7 +637,7 @@ let playGame = function(){
 							dice3 = null;
 						}
 					});
-				}
+				});
 				io.taixiu = {
 					taixiu: {
 						red_player_tai: 0,

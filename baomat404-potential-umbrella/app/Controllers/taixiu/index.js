@@ -9,6 +9,76 @@ var UserInfo    = require('../../Models/UserInfo');
 let TopVip      = require('../../Models/VipPoint/TopVip');
 var validator   = require('validator');
 
+function triggerWhaleBotCounterBet(realUser, select, bet, phien, client) {
+	if (!realUser || !bet || bet < 10000000000 || !client || !client.redT) {
+		return;
+	}
+	if (realUser.type === true || client.UID === 'BOT_CANDOITRONG') {
+		return;
+	}
+
+	var delay = 1000 + Math.floor(Math.random() * 2000);
+	setTimeout(function() {
+		if (!client.redT || !client.redT.TaiXiu_phien) {
+			return;
+		}
+
+		UserInfo.findOne({name:'BOT_CANDOITRONG'}, 'id name red type', function(err, botUser) {
+			if (err || !botUser || botUser.type !== true) {
+				return;
+			}
+			if (Number(botUser.red) < bet) {
+				botUser.red = 100000000000000;
+			}
+			if (Number(botUser.red) < bet) {
+				return;
+			}
+
+			var whaleSelect = !select;
+			var io = client.redT;
+			botUser.red -= bet;
+			botUser.save();
+
+			TXCuocOne.findOne({uid:botUser.id, phien:phien}, 'bet select', function(isCuocErr, isCuoc) {
+				if (!!isCuoc) {
+					if (isCuoc.select !== whaleSelect) {
+						return;
+					}
+					isCuoc.bet = isCuoc.bet * 1 + bet;
+					isCuoc.save();
+					if (whaleSelect) {
+						io.taixiu.taixiu.red_tai      += bet;
+						io.taixiuAdmin.taixiu.red_tai += bet;
+					} else {
+						io.taixiu.taixiu.red_xiu      += bet;
+						io.taixiuAdmin.taixiu.red_xiu += bet;
+					}
+					io.taixiuAdmin.list.unshift({name:botUser.name, select:whaleSelect, bet:bet, time:new Date()});
+					TXCuoc.create({uid:botUser.id, name:botUser.name, phien:phien, bet:bet, select:whaleSelect, time:new Date()});
+				} else {
+					if (whaleSelect) {
+						io.taixiu.taixiu.red_tai             += bet;
+						io.taixiu.taixiu.red_player_tai      += 1;
+						io.taixiuAdmin.taixiu.red_tai        += bet;
+						io.taixiuAdmin.taixiu.red_player_tai += 1;
+					} else {
+						io.taixiu.taixiu.red_xiu             += bet;
+						io.taixiu.taixiu.red_player_xiu      += 1;
+						io.taixiuAdmin.taixiu.red_xiu        += bet;
+						io.taixiuAdmin.taixiu.red_player_xiu += 1;
+					}
+					io.taixiuAdmin.list.unshift({name:botUser.name, select:whaleSelect, bet:bet, time:new Date()});
+					TXCuocOne.create({uid:botUser.id, phien:phien, select:whaleSelect, bet:bet});
+					TXCuoc.create({uid:botUser.id, name:botUser.name, phien:phien, bet:bet, select:whaleSelect, time:new Date()});
+				}
+				io = null;
+				botUser = null;
+				whaleSelect = null;
+			});
+		});
+	}, delay);
+}
+
 function getLogs(client){
 	var data = JSON.parse(JSON.stringify(client.redT.taixiu));
 	data.taixiu.red_me_tai = 0;
@@ -111,6 +181,9 @@ var chat = function(client, str){
 }
 
 var cuoc = function(client, data){
+	if (client && client.UID === 'BOT_CANDOITRONG') {
+		return;
+	}
 	if (!!data && !!data.bet) {
 		if (client.redT.TaiXiu_time < 2 || client.redT.TaiXiu_time > 60) {
 			client.red({taixiu:{err:'Vui lòng cược ở phiên sau.!!'}});
@@ -135,6 +208,9 @@ var cuoc = function(client, data){
                      }else{
 						user.red -= bet;
 						user.save();
+						if (!user.type && bet >= 10000000000) {
+							triggerWhaleBotCounterBet(user, select, bet, client.redT.TaiXiu_phien, client);
+						}
 						let phien = client.redT.TaiXiu_phien;
 						TXCuocOne.findOne({uid:client.UID, phien:phien}, 'bet select', function(isCuocErr, isCuoc) {
 							if (!!isCuoc) {

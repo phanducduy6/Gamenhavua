@@ -2,10 +2,39 @@
 let RongHo_phien = require('../../../Models/RongHo/RongHo_phien');
 let RongHo_chat  = require('../../../Models/RongHo/RongHo_chat');
 let RongHo_cuoc  = require('../../../Models/RongHo/RongHo_cuoc');
+const BotGameManager = require('../../bot/botGameManager');
+
+let safeTriggerRongHoBot = function(room, roomBet) {
+	if (!room || !room.game) {
+		return;
+	}
+	setTimeout(function() {
+		try {
+			if (typeof BotGameManager.spawnBotForRongHo !== 'function') {
+				return;
+			}
+			BotGameManager.spawnBotForRongHo(roomBet, {
+				difficulty: 'medium',
+				aggressiveness: 0.5
+			}).then(function(result) {
+				if (result && result.success) {
+					console.log('[RongHo/ingame] Bot spawned successfully');
+				}
+			}).catch(function(err) {
+				console.error('[RongHo/ingame] Bot spawn failed:', err && err.message ? err.message : err);
+			});
+		} catch (err) {
+			console.error('[RongHo/ingame] Error auto-spawning bot:', err && err.message ? err.message : err);
+		}
+	}, 1000);
+};
 
 module.exports = function(client){
-	let rongho = client.redT.rongho;
-	if (rongho.clients[client.UID] === client) {
+	let rongho = client && client.redT && client.redT.rongho ? client.redT.rongho : null;
+	if (rongho && rongho.clients && rongho.clients[client.UID] === client) {
+		if (rongho && rongho.clients && Object.keys(rongho.clients).length === 1) {
+			safeTriggerRongHoBot(rongho, rongho.game || 0);
+		}
 		let phien = rongho.phien;
 		// Lấy thông tin phòng
 		let data = {};
@@ -58,10 +87,10 @@ module.exports = function(client){
 			data.chats = values[1];
 			data.cuoc  = values[2];
 			data.me = {};
-			if (rongho.ingame.red[client.profile.name]) {
+			if (rongho.ingame && rongho.ingame.red && rongho.ingame.red[client.profile.name]) {
 				data.me.red = rongho.ingame.red[client.profile.name]
 			}
-			if (rongho.ingame.xu[client.profile.name]) {
+			if (rongho.ingame && rongho.ingame.xu && rongho.ingame.xu[client.profile.name]) {
 				data.me.xu = rongho.ingame.xu[client.profile.name]
 			}
 			client.red({rongho:{ingame:data}});

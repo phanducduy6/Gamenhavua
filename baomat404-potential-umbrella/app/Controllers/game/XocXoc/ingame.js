@@ -2,11 +2,40 @@
 let XocXoc_phien = require('../../../Models/XocXoc/XocXoc_phien');
 let XocXoc_chat  = require('../../../Models/XocXoc/XocXoc_chat');
 let XocXoc_cuoc  = require('../../../Models/XocXoc/XocXoc_cuoc');
+const BotGameManager = require('../../bot/botGameManager');
+
+let safeTriggerXocXocBot = function(room, roomBet) {
+	if (!room || !room.game) {
+		return;
+	}
+	setTimeout(function() {
+		try {
+			if (typeof BotGameManager.spawnBotForXocXoc !== 'function') {
+				return;
+			}
+			BotGameManager.spawnBotForXocXoc(roomBet, {
+				difficulty: 'medium',
+				aggressiveness: 0.5
+			}).then(function(result) {
+				if (result && result.success) {
+					console.log('[XocXoc/ingame] Bot spawned successfully');
+				}
+			}).catch(function(err) {
+				console.error('[XocXoc/ingame] Bot spawn failed:', err && err.message ? err.message : err);
+			});
+		} catch (err) {
+			console.error('[XocXoc/ingame] Error auto-spawning bot:', err && err.message ? err.message : err);
+		}
+	}, 1000);
+};
 
 module.exports = function(client){
-	let xocxoc = client.redT.game.xocxoc;
-	if (xocxoc.clients[client.UID] === client) {
+	let xocxoc = client && client.redT && client.redT.game && client.redT.game.xocxoc ? client.redT.game.xocxoc : null;
+	if (xocxoc && xocxoc.clients && xocxoc.clients[client.UID] === client) {
 		let phien = xocxoc.phien;
+		if (xocxoc && xocxoc.clients && Object.keys(xocxoc.clients).length === 1 && xocxoc.botCount === 0) {
+			safeTriggerXocXocBot(xocxoc, xocxoc.game || 0);
+		}
 		// Lấy thông tin phòng
 		let data = {};
 		data.time   = xocxoc.time;
@@ -58,7 +87,7 @@ module.exports = function(client){
 			data.chats = values[1];
 			data.cuoc  = values[2];
 			data.me = {};
-			if (xocxoc.ingame.red[client.profile.name]) {
+			if (xocxoc.ingame && xocxoc.ingame.red && xocxoc.ingame.red[client.profile.name]) {
 				data.me.red = xocxoc.ingame.red[client.profile.name]
 			}
 			client.red({xocxoc:{ingame:data}});
