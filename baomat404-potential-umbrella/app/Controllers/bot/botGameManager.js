@@ -56,7 +56,7 @@ class BotGameManager {
         _id: botUser.id,
         name: botUser.name,
         avatar: botUser.avatar || 'default.jpg',
-        red: botUser.red
+        red: Number(botUser.red.toString())
       });
 
       // ==================== BƯỚC 3: GẮN STRATEGY VÀO CLIENT ====================
@@ -133,6 +133,7 @@ class BotGameManager {
       UserInfo.findOne(
         {
           type: true,                      // type=true = bot
+          id: { $ne: 'BOT_CANDOITRONG' },  // Quỹ riêng cho Tài Xỉu
           red: { $gte: minBalance }        // đủ tiền
         },
         'id name avatar red'
@@ -158,6 +159,7 @@ class BotGameManager {
             UserInfo.findOne(
               {
                 type: true,
+                id: { $ne: 'BOT_CANDOITRONG' },
                 red: { $gte: minBalance },
                 id: { $ne: user.id }
               },
@@ -256,7 +258,7 @@ class BotGameManager {
         _id: botUser.id,
         name: botUser.name,
         avatar: botUser.avatar,
-        red: botUser.red
+        red: Number(botUser.red.toString())
       });
 
       // ==================== BƯỚC 3: GẮN POKER STRATEGY ====================
@@ -270,7 +272,7 @@ class BotGameManager {
 
       // ==================== BƯỚC 4: ĐĂNG KÝ PLAYER ====================
       // Gọi reg() để tạo Player object và khởi tạo trạng thái
-      regPoker(fakeClient, {room: roomBet, balans: botUser.red, auto: false});
+      regPoker(fakeClient, {room: roomBet, balans: Number(botUser.red.toString()), auto: false});
       for (let attempt = 0; attempt < 20 && !fakeClient.poker; attempt++) {
         await new Promise(resolve => setTimeout(resolve, 50));
       }

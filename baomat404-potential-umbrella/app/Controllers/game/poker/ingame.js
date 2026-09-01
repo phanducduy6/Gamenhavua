@@ -1,7 +1,6 @@
 
 let Room   = require('./lib/room');
 let crypto = require('crypto');
-const BotGameManager = require('../../bot/botGameManager');
 
 let safeTriggerBot = function(room, method, roomBet, label) {
 	if (!room || !room.game) {
@@ -9,6 +8,7 @@ let safeTriggerBot = function(room, method, roomBet, label) {
 	}
 	setTimeout(function() {
 		try {
+			const BotGameManager = require('../../bot/botGameManager');
 			if (typeof BotGameManager[method] !== 'function') {
 				return;
 			}

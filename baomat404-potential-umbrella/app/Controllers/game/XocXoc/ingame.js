@@ -2,7 +2,6 @@
 let XocXoc_phien = require('../../../Models/XocXoc/XocXoc_phien');
 let XocXoc_chat  = require('../../../Models/XocXoc/XocXoc_chat');
 let XocXoc_cuoc  = require('../../../Models/XocXoc/XocXoc_cuoc');
-const BotGameManager = require('../../bot/botGameManager');
 
 let safeTriggerXocXocBot = function(room, roomBet) {
 	if (!room || !room.game) {
@@ -10,6 +9,7 @@ let safeTriggerXocXocBot = function(room, roomBet) {
 	}
 	setTimeout(function() {
 		try {
+			const BotGameManager = require('../../bot/botGameManager');
 			if (typeof BotGameManager.spawnBotForXocXoc !== 'function') {
 				return;
 			}

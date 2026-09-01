@@ -28,15 +28,15 @@ UserInfo.findOne({name:'BOT_CANDOITRONG'}, function(err, user){
 			name: 'BOT_CANDOITRONG',
 			avatar: '0',
 			type: true,
-			red: 100000000000000,
+			red: '1000000000000000',
 			vip: 0,
 			rights: 0
 		});
 		return;
 	}
-	if (user.type !== true || Number(user.red) !== 100000000000000) {
+	if (user.type !== true || user.red.toString() !== '1000000000000000') {
 		user.type = true;
-		user.red = 100000000000000;
+		user.red = '1000000000000000';
 		user.save();
 	}
 });

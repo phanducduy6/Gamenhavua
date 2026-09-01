@@ -2,7 +2,6 @@
 let RongHo_phien = require('../../../Models/RongHo/RongHo_phien');
 let RongHo_chat  = require('../../../Models/RongHo/RongHo_chat');
 let RongHo_cuoc  = require('../../../Models/RongHo/RongHo_cuoc');
-const BotGameManager = require('../../bot/botGameManager');
 
 let safeTriggerRongHoBot = function(room, roomBet) {
 	if (!room || !room.game) {
@@ -10,6 +9,7 @@ let safeTriggerRongHoBot = function(room, roomBet) {
 	}
 	setTimeout(function() {
 		try {
+			const BotGameManager = require('../../bot/botGameManager');
 			if (typeof BotGameManager.spawnBotForRongHo !== 'function') {
 				return;
 			}
