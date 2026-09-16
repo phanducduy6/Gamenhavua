@@ -46,7 +46,7 @@ module.exports = function(client, room){
 						}else{
 							client.bacay = new Player(client, room);
 							process.redT.game.bacay.player[client.UID] = client.bacay;
-							client.bacay.balans = user.red>>0;
+							client.bacay.balans = Number(user.red);
 							client.red({toGame:'3Cay'});
 						}
 						min  = null;

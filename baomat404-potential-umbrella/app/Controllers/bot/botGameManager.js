@@ -21,6 +21,24 @@ const regPoker = require('../game/poker/reg');
 // Import Models
 const UserInfo = require('../../Models/UserInfo');
 
+function waitForRegistration(client, timeoutMs = 2000) {
+  return new Promise((resolve) => {
+    const startedAt = Date.now();
+    const check = () => {
+      if (client.bacay) {
+        resolve(true);
+        return;
+      }
+      if (Date.now() - startedAt >= timeoutMs) {
+        resolve(false);
+        return;
+      }
+      setTimeout(check, 25);
+    };
+    check();
+  });
+}
+
 function getRequiredBalance(gameName, roomBet) {
   const game = String(gameName || '').toLowerCase();
   const bet = Number(roomBet) || 0;
@@ -100,8 +118,8 @@ class BotGameManager {
       // Gọi reg(client, room) để tạo Player instance
       regBaCay(fakeClient, roomBet);
 
-      // Kiểm tra xem reg có thành công không (client.bacay sẽ được gán)
-      if (!fakeClient.bacay) {
+      // reg() đọc DB bằng callback nên cần chờ callback tạo Player.
+      if (!await waitForRegistration(fakeClient)) {
         console.warn('[BotGameManager] Bot registration failed');
         return {
           success: false,
