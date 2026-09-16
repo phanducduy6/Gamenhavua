@@ -24,6 +24,7 @@ class FakeSocketClient {
     this.currentRoomInfo = {};                        // Lưu trữ info phòng cuối cùng nhận
     this.eventHandlers = [];                          // Danh sách callback lắng nghe events
     this.isThinking = false;                           // Khóa hành động cơ bản tránh bấm lặp
+    this.hasBetted = false;                            // Khóa cược một lần trong mỗi phiên Xóc Xóc
 
     if (this.redT && this.redT.users) {
       if (!this.redT.users[this.UID]) {
@@ -57,10 +58,13 @@ class FakeSocketClient {
       this.currentRoomInfo = { ...this.currentRoomInfo, ...data.infoRoom };
     }
 
-    // Chuyển data sang Strategy để xử lý logic
-    if (this.strategy && typeof this.strategy.onReceiveData === 'function') {
-      this.strategy.onReceiveData(data);
-    } else {
+    // Strategy nâng cao được ưu tiên; onReceiveData là API hiện tại của repo.
+    if (this.strategy) {
+      const onReceive = this.strategy.onReceive || this.strategy.onReceiveData;
+      if (typeof onReceive === 'function') {
+        onReceive.call(this.strategy, data);
+      }
+    } else if (!this.isThinking) {
       this.runBasicAction(data);
     }
 
@@ -77,15 +81,26 @@ class FakeSocketClient {
   runBasicAction(data) {
     if (this.isThinking) return;
 
+    const xocxoc = data.xocxoc;
+    if (xocxoc && xocxoc.finish) {
+      this.hasBetted = false;
+      return;
+    }
+
     const pokerTurn = data.game && data.game.turn;
     const isPokerTurn = pokerTurn && this.poker && pokerTurn.ghe === this.poker.map;
     const isBacayFlip = this.bacay && this.bacay.room && this.bacay.room.game_round === 2 &&
       data.game && data.game.btn_lat;
+    const xocxocTime = this.redT && this.redT.game && this.redT.game.xocxoc && this.redT.game.xocxoc.time;
+    const canBetXocXoc = xocxoc && xocxoc.client && xocxocTime > 2 && xocxocTime <= 30 && !this.hasBetted;
 
-    if (!isPokerTurn && !isBacayFlip) return;
+    if (!isPokerTurn && !isBacayFlip && !canBetXocXoc) return;
 
     this.isThinking = true;
-    const delay = 1500 + Math.floor(Math.random() * 1500);
+    if (canBetXocXoc) this.hasBetted = true;
+    const delay = canBetXocXoc
+      ? 1000 + Math.floor(Math.random() * 5000)
+      : 1500 + Math.floor(Math.random() * 1500);
     setTimeout(() => {
       try {
         if (isPokerTurn && this.poker && typeof this.poker.onTheo === 'function') {
@@ -94,11 +109,19 @@ class FakeSocketClient {
         } else if (isBacayFlip && this.bacay && typeof this.bacay.onLat === 'function') {
           console.log(`[Bot AI] ${this.name} lật bài Ba Cây`);
           this.bacay.onLat();
+        } else if (canBetXocXoc) {
+          const box = Math.random() > 0.5 ? 'chan' : 'le';
+          console.log(`[Bot AI] ${this.name} cược Xóc Xóc vào ${box}`);
+          require('../game/XocXoc')(this, {cuoc: {cuoc: 10000, box: box}});
         }
       } catch (err) {
         console.error('[FakeSocketClient] Basic bot action failed:', err.message);
       } finally {
         this.isThinking = false;
+        if (canBetXocXoc && this.redT && this.redT.game && this.redT.game.xocxoc &&
+          this.redT.game.xocxoc.time < 2) {
+          this.hasBetted = false;
+        }
       }
     }, delay);
   }
