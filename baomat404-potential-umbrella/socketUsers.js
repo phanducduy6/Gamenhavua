@@ -2,6 +2,7 @@ let validator = require('validator');
 let User      = require('./app/Models/Users');
 let UserInfo  = require('./app/Models/UserInfo');
 let helpers   = require('./app/Helpers/Helpers');
+let TelegramAuth = require('./app/Helpers/TelegramAuth');
 let socket    = require('./app/socket.js');
 let captcha   = require('./captcha');
 let forgotpass = require('./app/Controllers/user/for_got_pass');
@@ -9,6 +10,63 @@ let forgotpass = require('./app/Controllers/user/for_got_pass');
 // Authenticate!
 let authenticate = function(client, data, callback) {
 	if (!!data){
+		if (!!data.initData) {
+			let tgUser = TelegramAuth.verifyTelegramWebAppData(data.initData);
+			if (!tgUser || tgUser.id === undefined || tgUser.id === null) {
+				callback({title:'LỖI', text:'Xác thực Telegram thất bại!'}, false);
+				return void 0;
+			}
+
+			let telegramId = tgUser.id.toString();
+			User.findOne({'telegram.id':telegramId}, function(err, user){
+				if (err) {
+					console.error('Lỗi truy vấn DB:', err);
+					callback({title:'LỖI', text:'Không thể xác thực tài khoản.'}, false);
+					return void 0;
+				}
+				if (user) {
+					if (user.lock === true || user.local.ban_login) {
+						callback({title:'CẤM', text:'Tài khoản bị vô hiệu hóa.'}, false);
+						return void 0;
+					}
+					client.UID = user._id.toString();
+					console.log(`[Telegram] Đăng nhập thành công: ${tgUser.first_name || telegramId}`);
+					callback(false, true);
+					return void 0;
+				}
+
+				let username = 'tg' + telegramId;
+				let password = helpers.generateHash(require('crypto').randomBytes(32).toString('hex'));
+				User.create({
+					'local.username': username,
+					'local.password': password,
+					'local.regDate': new Date(),
+					telegram: {id: telegramId, username: tgUser.username || ''}
+				}, function(createErr, newUser){
+					if (createErr || !newUser) {
+						console.error('Lỗi tạo tài khoản Telegram:', createErr);
+						callback({title:'LỖI', text:'Không thể tạo tài khoản Telegram.'}, false);
+						return void 0;
+					}
+					UserInfo.create({
+						id: newUser._id.toString(),
+						name: username
+					}, function(infoErr){
+						if (infoErr) {
+							console.error('Lỗi tạo thông tin tài khoản Telegram:', infoErr);
+							User.deleteOne({_id:newUser._id}).exec();
+							callback({title:'LỖI', text:'Không thể tạo thông tin tài khoản Telegram.'}, false);
+							return void 0;
+						}
+						client.UID = newUser._id.toString();
+						console.log(`[Telegram] Bắt đầu tạo tài khoản mới cho: ${tgUser.first_name || telegramId}`);
+						callback(false, true);
+					});
+				});
+			});
+			return void 0;
+		}
+
 		let token = data.token;
 		if (!!token && !!data.id) {
 			let id = data.id>>0;

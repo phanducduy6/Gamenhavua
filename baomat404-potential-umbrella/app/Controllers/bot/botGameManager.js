@@ -119,15 +119,16 @@ class BotGameManager {
    * 
    * Bot phải:
    * - Có type = true (là bot)
-   * - Có red >= roomBet * 4 (đủ tiền cấu thành)
+    * - Có red >= roomBet * minMultiplier (đủ tiền cấu thành)
    * - Chưa đang chơi game nào
    * 
    * @param {number} roomBet - Mức cược cần thiết
+   * @param {number} minMultiplier - Hệ số số dư tối thiểu cần có
    * @returns {Promise<Object|null>} - Bot user object hoặc null
    */
-  static async findAvailableBot(roomBet) {
+  static async findAvailableBot(roomBet, minMultiplier = 4) {
     return new Promise((resolve) => {
-      const minBalance = roomBet * 4; // Ba Cây yêu cầu tối thiểu 4x mức cược
+      const minBalance = roomBet * minMultiplier;
 
       // Tìm bot trong UserInfo
       UserInfo.findOne(
@@ -240,7 +241,7 @@ class BotGameManager {
       console.log(`[BotGameManager] Spawning bot for Poker room (bet: ${roomBet})`);
 
       // ==================== BƯỚC 1: TÌM BOT ĐỦ TIỀN ====================
-      const botUser = await this.findAvailableBot(roomBet);
+      const botUser = await this.findAvailableBot(roomBet, 20);
       
       if (!botUser) {
         console.warn('[BotGameManager] No available bot found for Poker');

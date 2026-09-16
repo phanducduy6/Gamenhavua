@@ -34,6 +34,10 @@ let Schema = new mongoose.Schema({
 		name:       String,
 		regDate:    Date,
 	},
+	telegram: {
+		id:          {type:String, unique:true, sparse:true},
+		username:    String,
+	},
 	fail: {type:Number,  default:0},
 	lock: {type:Boolean, default:false},
 });

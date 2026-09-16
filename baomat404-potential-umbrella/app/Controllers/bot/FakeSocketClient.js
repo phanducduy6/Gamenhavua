@@ -21,6 +21,13 @@ class FakeSocketClient {
     this.redT = process.redT;                        // Shared game state
     this.currentRoomInfo = {};                        // Lưu trữ info phòng cuối cùng nhận
     this.eventHandlers = [];                          // Danh sách callback lắng nghe events
+
+    if (this.redT && this.redT.users) {
+      if (!this.redT.users[this.UID]) {
+        this.redT.users[this.UID] = [];
+      }
+      this.redT.users[this.UID].push(this);
+    }
     
     // ==================== STRATEGY INSTANCE ====================
     this.strategy = null;                            // BacayStrategy instance (gán sau)

@@ -1,6 +1,7 @@
 
 let AutoIncrement = require('mongoose-auto-increment-reworked').MongooseAutoIncrementID;
 let mongoose      = require('mongoose');
+require('mongoose-long')(mongoose);
 
 let Schema = new mongoose.Schema({
 	id:        {type:String, required:true, unique:true}, // ID đăng nhập
