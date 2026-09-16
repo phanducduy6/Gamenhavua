@@ -11,14 +11,16 @@ class FakeSocketClient {
     this.UID = botUserData._id.toString();           // ID MongoDB của bot
     this.profile = {
       name: botUserData.name || 'Bot_' + this.UID.slice(-6),
-      avatar: botUserData.avatar || 'default_avatar.jpg'
+      avatar: botUserData.avatar || 'default_avatar.jpg',
+      red: Number(botUserData.red) || 0
     };
-      this.balance = botUserData.red || 0;             // Số dư tài khoản
+    this.name = this.profile.name;
+    this.balance = this.profile.red;                    // Số dư tài khoản
     
     // ==================== TRẠNG THÁI GAME ====================
     this.bacay = null;                               // Reference đến Player instance
     this.poker = null;                               // Reference đến Poker Player instance
-    this.redT = process.redT;                        // Shared game state
+    this.redT = process.redT;                          // Shared game state
     this.currentRoomInfo = {};                        // Lưu trữ info phòng cuối cùng nhận
     this.eventHandlers = [];                          // Danh sách callback lắng nghe events
 
@@ -93,7 +95,20 @@ class FakeSocketClient {
    * Cập nhật số dư tài khoản
    */
   updateBalance(newBalance) {
-    this.balance = newBalance;
+    this.balance = Number(newBalance) || 0;
+    this.profile.red = this.balance;
+  }
+
+  redUpdate(newBalance) {
+    if (typeof newBalance === 'number') {
+      this.updateBalance(newBalance);
+    }
+  }
+
+  redT(newBalance) {
+    if (typeof newBalance === 'number') {
+      this.updateBalance(newBalance);
+    }
   }
 
   /**

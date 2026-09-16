@@ -21,6 +21,24 @@ const regPoker = require('../game/poker/reg');
 // Import Models
 const UserInfo = require('../../Models/UserInfo');
 
+function getRequiredBalance(gameName, roomBet) {
+  const game = String(gameName || '').toLowerCase();
+  const bet = Number(roomBet) || 0;
+
+  switch (game) {
+    case 'poker':
+      return bet * 20;
+    case 'bacay':
+    case 'ba cây':
+      return bet * 4;
+    case 'lieng':
+    case 'liêng':
+      return bet * 5;
+    default:
+      return bet * 4;
+  }
+}
+
 class BotGameManager {
   /**
    * Spawn bot vào phòng Ba Cây
@@ -37,13 +55,23 @@ class BotGameManager {
       console.log(`[BotGameManager] Spawning bot for Ba Cay room (bet: ${roomBet})`);
 
       // ==================== BƯỚC 1: TÌM BOT ĐỦ TIỀN ====================
-      const botUser = await this.findAvailableBot(roomBet);
+      const botUser = await this.findAvailableBot('bacay', roomBet);
        
       if (!botUser) {
         console.warn('[BotGameManager] No available bot found');
         return {
           success: false,
           message: 'No available bot with sufficient balance',
+          botClient: null
+        };
+      }
+
+      const bacayRooms = Object.values((process.redT && process.redT.game && process.redT.game.bacay && process.redT.game.bacay.room) || {});
+      const fullRoom = bacayRooms.find(room => room && room.game === Number(roomBet) && room.online >= 5);
+      if (fullRoom) {
+        return {
+          success: false,
+          message: 'Ba Cay room is full (maximum 5 players)',
           botClient: null
         };
       }
@@ -126,55 +154,50 @@ class BotGameManager {
    * @param {number} minMultiplier - Hệ số số dư tối thiểu cần có
    * @returns {Promise<Object|null>} - Bot user object hoặc null
    */
-  static async findAvailableBot(roomBet, minMultiplier = 4) {
-    return new Promise((resolve) => {
-      const minBalance = roomBet * minMultiplier;
+  static async findAvailableBot(gameName, roomBet) {
+    const requiredRed = getRequiredBalance(gameName, roomBet);
+    const excludedIds = ['BOT_CANDOITRONG'];
+    const gameState = process.redT && process.redT.game && process.redT.game[String(gameName || '').toLowerCase()];
 
-      // Tìm bot trong UserInfo
-      UserInfo.findOne(
-        {
-          type: true,                      // type=true = bot
-          id: { $ne: 'BOT_CANDOITRONG' },  // Quỹ riêng cho Tài Xỉu
-          red: { $gte: minBalance }        // đủ tiền
-        },
-        'id name avatar red'
-      ).exec((err, user) => {
-        if (err) {
-          console.error('[BotGameManager] Database error:', err.message);
-          resolve(null);
-          return;
+    const isBotInGame = (botId) => {
+      if (!gameState) return false;
+      if (gameState.player && gameState.player[botId] && gameState.player[botId].room) {
+        return true;
+      }
+      return Object.values(gameState.room || {}).some(roomGroup =>
+        Object.values(roomGroup || {}).some(room =>
+          Object.values(room.player || {}).some(seat => {
+            const player = seat && (seat.data || seat);
+            return player && player.uid === botId;
+          })
+        )
+      );
+    };
+
+    try {
+      while (true) {
+        const bot = await UserInfo.findOne({
+          type: true,
+          id: { $nin: excludedIds },
+          red: { $gte: requiredRed }
+        }, 'id name avatar red').sort({ red: -1 }).exec();
+
+        if (!bot) {
+          console.warn(`[BotGameManager] No ${gameName} bot found with balance >= ${requiredRed}`);
+          return null;
         }
 
-        if (!user) {
-          console.warn(`[BotGameManager] No bot found with balance >= ${minBalance}`);
-          resolve(null);
-          return;
+        if (!isBotInGame(bot.id)) {
+          return bot;
         }
 
-        // Kiểm tra xem bot có đang chơi không
-        if (process.redT && process.redT.game && process.redT.game.bacay) {
-          const botInGame = process.redT.game.bacay.player[user.id];
-          if (botInGame && botInGame.room) {
-            console.log(`[BotGameManager] Bot ${user.id} is already in game, skipping`);
-            // Tìm bot khác
-            UserInfo.findOne(
-              {
-                type: true,
-                id: { $ne: 'BOT_CANDOITRONG' },
-                red: { $gte: minBalance },
-                id: { $ne: user.id }
-              },
-              'id name avatar red'
-            ).exec((err2, user2) => {
-              resolve(err2 ? null : user2);
-            });
-            return;
-          }
-        }
-
-        resolve(user);
-      });
-    });
+        console.log(`[BotGameManager] Bot ${bot.id} is already in game, skipping`);
+        excludedIds.push(bot.id);
+      }
+    } catch (err) {
+      console.error('[BotGameManager] Database error:', err.message);
+      return null;
+    }
   }
 
   /**
@@ -241,7 +264,7 @@ class BotGameManager {
       console.log(`[BotGameManager] Spawning bot for Poker room (bet: ${roomBet})`);
 
       // ==================== BƯỚC 1: TÌM BOT ĐỦ TIỀN ====================
-      const botUser = await this.findAvailableBot(roomBet, 20);
+      const botUser = await this.findAvailableBot('poker', roomBet);
       
       if (!botUser) {
         console.warn('[BotGameManager] No available bot found for Poker');
@@ -405,3 +428,4 @@ class BotGameManager {
 }
 
 module.exports = BotGameManager;
+module.exports.getRequiredBalance = getRequiredBalance;
