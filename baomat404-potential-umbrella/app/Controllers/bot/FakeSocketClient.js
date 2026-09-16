@@ -23,6 +23,7 @@ class FakeSocketClient {
     this.redT = process.redT;                          // Shared game state
     this.currentRoomInfo = {};                        // Lưu trữ info phòng cuối cùng nhận
     this.eventHandlers = [];                          // Danh sách callback lắng nghe events
+    this.isThinking = false;                           // Khóa hành động cơ bản tránh bấm lặp
 
     if (this.redT && this.redT.users) {
       if (!this.redT.users[this.UID]) {
@@ -59,6 +60,8 @@ class FakeSocketClient {
     // Chuyển data sang Strategy để xử lý logic
     if (this.strategy && typeof this.strategy.onReceiveData === 'function') {
       this.strategy.onReceiveData(data);
+    } else {
+      this.runBasicAction(data);
     }
 
     // Gọi các callback từ event handlers (nếu có)
@@ -69,6 +72,35 @@ class FakeSocketClient {
         console.error('[FakeSocketClient] Error in event handler:', err.message);
       }
     });
+  }
+
+  runBasicAction(data) {
+    if (this.isThinking) return;
+
+    const pokerTurn = data.game && data.game.turn;
+    const isPokerTurn = pokerTurn && this.poker && pokerTurn.ghe === this.poker.map;
+    const isBacayFlip = this.bacay && this.bacay.room && this.bacay.room.game_round === 2 &&
+      data.game && data.game.btn_lat;
+
+    if (!isPokerTurn && !isBacayFlip) return;
+
+    this.isThinking = true;
+    const delay = 1500 + Math.floor(Math.random() * 1500);
+    setTimeout(() => {
+      try {
+        if (isPokerTurn && this.poker && typeof this.poker.onTheo === 'function') {
+          console.log(`[Bot AI] ${this.name} chọn Theo bài Poker`);
+          this.poker.onTheo();
+        } else if (isBacayFlip && this.bacay && typeof this.bacay.onLat === 'function') {
+          console.log(`[Bot AI] ${this.name} lật bài Ba Cây`);
+          this.bacay.onLat();
+        }
+      } catch (err) {
+        console.error('[FakeSocketClient] Basic bot action failed:', err.message);
+      } finally {
+        this.isThinking = false;
+      }
+    }, delay);
   }
 
   /**
